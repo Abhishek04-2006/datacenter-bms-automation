@@ -1,23 +1,39 @@
-version: '3.8'
-
 services:
-  mqtt-broker:
-    image: eclipse-mosquitto:latest
-    container_name: bms_mqtt_broker
-    ports:
-      - "1883:1883"
-    # This allows anonymous connections for easy local testing
+  field_layer:
+    image: python:3.11-slim
+    container_name: scada_field_layer
     volumes:
-      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
-
-  influxdb:
-    image: influxdb:2.7
-    container_name: bms_telemetry_db
+      - .:/app
+    working_dir: /app
     ports:
-      - "8086:8086"
-    environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=admin
-      - DOCKER_INFLUXDB_INIT_PASSWORD=Password12345
-      - DOCKER_INFLUXDB_INIT_ORG=datacenter_ops
-      - DOCKER_INFLUXDB_INIT_BUCKET=bms_metrics
+      - "5020:5020"
+    # Update this line to handle the pip installation sequence before booting the server
+    command: >
+      sh -c "pip install -r requirements.txt && python rack_sensor.py"
+    restart: always
+
+  scada-brain:
+    image: python:3.11-slim
+    container_name: scada_brain_core
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: >
+      sh -c "pip install -r requirements.txt && python bms_brain.py"
+    depends_on:
+      - field_layer # <-- Match the updated key name here
+    restart: always
+
+  dashboard-ui:
+    image: python:3.11-slim
+    container_name: dcim_dashboard_ui
+    volumes:
+      - .:/app
+    working_dir: /app
+    ports:
+      - "8501:8501"
+    command: >
+      sh -c "pip install -r requirements.txt && streamlit run bms_dashboard.py --server.port=8501 --server.address=0.0.0.0"
+    depends_on:
+      - scada-brain
+    restart: always
