@@ -4,8 +4,8 @@ import pandas as pd
 import time
 import random
 import plotly.graph_objects as go
-import os
 from datetime import datetime
+import os
 
 # 1. PAGE LAYOUT SETUP
 st.set_page_config(page_title="Sify Tech Premium DCIM", layout="wide")
@@ -16,7 +16,6 @@ def display_sify_logo(img_width=150):
     if os.path.exists(logo_path):
         st.image(logo_path, width=img_width)
     else:
-        # Fallback branding badge if Docker sync delays the file
         st.markdown(f'<div style="background: linear-gradient(135deg, #00529b 0%, #002d5a 100%); color: white; padding: 6px 14px; border-radius: 4px; font-weight: bold; letter-spacing: 1px; display: inline-block; margin-bottom: 10px; font-size: 14px; border: 1px solid #0072ce;">SIFY TECHNOCRAFT DCIM</div>', unsafe_allow_html=True)
 
 # 2. INDUSTRIAL SCADA THEME STYLING
@@ -139,7 +138,7 @@ for aisle_name, racks in AISLES.items():
         """, (rack_id, rand_temp, rand_load, rand_hum, status, current_time_str))
 conn.commit()
 
-# Prevent memory leaks: Keep only latest 1500 rows for charts performance
+# Prevent memory leaks
 cursor.execute("DELETE FROM rack_telemetry WHERE id NOT IN (SELECT id FROM rack_telemetry ORDER BY id DESC LIMIT 1500)")
 conn.commit()
 
@@ -249,6 +248,38 @@ elif page == "📊 Live SCADA Matrix Monitor":
                 <h2>{total_load} kW</h2>
             </div>
             """, unsafe_allow_html=True)
+            
+            # --- NEW INTERACTIVE PUE GAUGE METER ---
+            # Dynamically correlate PUE factor with server real-loads
+            simulated_pue = round(1.2 + (total_load / 1000.0) + random.uniform(-0.02, 0.02), 2)
+            
+            fig_pue = go.Figure(go.Indicator(
+                mode = "gauge+number",
+                value = simulated_pue,
+                domain = {'x': [0, 1], 'y': [0, 1]},
+                title = {'text': "Live PUE Efficiency Factor", 'font': {'color': '#94A3B8', 'size': 14}},
+                gauge = {
+                    'axis': {'range': [1.0, 2.0], 'tickwidth': 1, 'tickcolor': "#64748b"},
+                    'bar': {'color': "#00FF66" if simulated_pue < 1.5 else "#FFAA00"},
+                    'bgcolor': "rgba(13,21,39,0.5)",
+                    'borderwidth': 1,
+                    'bordercolor': "#1e293b",
+                    'steps': [
+                        {'range': [1.0, 1.3], 'color': 'rgba(0, 255, 102, 0.1)'}, # Ultra Efficient Zone
+                        {'range': [1.3, 1.7], 'color': 'rgba(255, 170, 0, 0.1)'}, # Nominal Zone
+                        {'range': [1.7, 2.0], 'color': 'rgba(255, 51, 51, 0.1)'}  # High Waste Zone
+                    ],
+                }
+            ))
+            
+            fig_pue.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font={'color': "#E2E8F0", 'family': "Inter"},
+                margin=dict(l=20, r=20, t=40, b=10),
+                height=220
+            )
+            st.plotly_chart(fig_pue, use_container_width=True)
         
         st.markdown("---")
         
